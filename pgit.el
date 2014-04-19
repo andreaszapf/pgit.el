@@ -32,6 +32,13 @@
 belongs to a project. Automatically set during loading a file
 that is part of a pgit-project")
 
+(defvar pgit-dirs nil
+  "A list of top-level subdirectories a pgit project consists
+of. Useful if you want to limit pgit to just a subset of your
+working copy. If nil, the whole working copy is considered as
+project. Should be set as a project-local variable in
+`pgit-define-project-class'")
+
 (defun pgit--add-to-safe-local-variables (variable-value-list)
   (dolist (variable-value-pair variable-value-list)
     (add-to-list 'safe-local-variable-values variable-value-pair)))
