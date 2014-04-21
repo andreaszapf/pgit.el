@@ -39,6 +39,10 @@ working copy. If nil, the whole working copy is considered as
 project. Should be set as a project-local variable in
 `pgit-define-project-class'")
 
+(defvar pgit-completion-system 'ido
+  "Completion system used for pgit prompts.
+FIXME: Check whether ido can be used.")
+
 (defun pgit--add-to-safe-local-variables (variable-value-list)
   (dolist (variable-value-pair variable-value-list)
     (add-to-list 'safe-local-variable-values variable-value-pair)))
@@ -83,6 +87,10 @@ project."
 (defalias 'pgit-make-project 'dir-locals-set-directory-class
   "Call to make the given directory a project of the given class.")
 
+(defun pgit-in-project-p ()
+  "Returns t if we're currently within a pgit project"
+  (and pgit-root (file-directory-p pgit-root)))
+
 (defun pgit-set-pgit-root ()
   "Sets the variable pgit-root buffer-locally to the root of the
 current git working copy. Should be called when setting
@@ -92,5 +100,40 @@ FIXME: maybe it'd be sufficient to set this via a file-load hook,
 if there was such a thing"
   (require 'vc-hooks)
   (set (make-local-variable 'pgit-root) (vc-find-root default-directory ".git")))
+
+(defun pgit-completing-read (prompt choices)
+  "Dispatch to ido or default completing read."
+  (cond
+   ((eq pgit-completion-system 'ido)
+    (ido-completing-read prompt choices))
+   ((eq pgit-completion-system 'default)
+    (completing-read prompt choices))
+   (t (funcall pgit-completion-system prompt choices))))
+
+(defun pgit-current-project-files ()
+  "Return a list of files for the current project, paths are
+relative to the project root."
+  (let* ((default-directory pgit-root)
+         (relevant-directories
+          (mapconcat 'shell-quote-argument pgit-dirs " "))
+         (command
+          (format "git ls-files -- %s" relevant-directories))
+         (result-and-output
+          (with-temp-buffer
+            (list (call-process-shell-command command nil t nil)
+                  (buffer-string))))
+         (result (car result-and-output))
+         (output (nth 1 result-and-output)))
+    (if (= 0 result)
+      (split-string output "\n" t))))
+
+(defun pgit-find-file (&optional arg)
+  "Jump to a project's file using completion."
+  (interactive "P")
+  (if (pgit-in-project-p)
+      (let ((file (pgit-completing-read "Find file: "
+                                        (pgit-current-project-files))))
+        (find-file (expand-file-name file pgit-root)))
+    (error "Not in a pgit project." )))
 
 ;;; pgit.el ends here
