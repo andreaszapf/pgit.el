@@ -39,6 +39,23 @@ working copy. If nil, the whole working copy is considered as
 project. Should be set as a project-local variable in
 `pgit-define-project-class'")
 
+(defvar pgit-grep-file-patterns nil
+  "A list of glob patterns to be used by pgit-grep. See help for 'git grep'
+for more info about supported patterns.
+
+Example:
+
+ '(\"*.[ch]pp\"
+   \"*.[ch]\"
+   \"*.m\"
+    \"*.mm\"
+    \"*.r\"
+    \"*.txt\"
+    \"*.py\"
+    \"*.feature\"
+    \"*.rb\"
+    \"*.pl\")")
+
 (defvar pgit-completion-system 'ido
   "Completion system used for pgit prompts.
 FIXME: Check whether ido can be used.")
@@ -134,6 +151,35 @@ relative to the project root."
       (let ((file (pgit-completing-read "Find file: "
                                         (pgit-current-project-files))))
         (find-file (expand-file-name file pgit-root)))
+    (error "Not in a pgit project." )))
+
+(defun pgit--make-dir-patterns (dirname)
+  (let ((dir (file-name-as-directory dirname)))
+    (mapcar
+     (lambda (pattern) (concat dir pattern))
+     pgit-grep-file-patterns)))
+
+(defun pgit-grep-project-patterns ()
+  "Return file name patterns to be passed to vc-git-grep"
+  (let ((patterns
+         (if (not pgit-dirs)
+             pgit-grep-file-patterns
+           ;; apply 'append concats all lists returned by mapcar into
+           ;; one.
+           (apply 'append (mapcar 'pgit--make-dir-patterns pgit-dirs)))))
+    (mapconcat 'shell-quote-argument patterns " ")))
+
+(defun pgit-grep (regexp)
+  "Search for REGEXP in the project"
+  (interactive
+   (progn
+     (require 'grep)
+     (let* ((regexp (grep-read-regexp)))
+       (list regexp))))
+  (if (pgit-in-project-p)
+      (progn
+        (require 'vc-git)
+        (vc-git-grep regexp (pgit-grep-project-patterns) pgit-root))
     (error "Not in a pgit project." )))
 
 ;;; pgit.el ends here
